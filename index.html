@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Compass</title>
+
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+
+<link rel="apple-touch-icon" sizes="57x57" href="icons/apple-touch-icon-57x57.png" />
+<link rel="apple-touch-icon" sizes="72x72" href="icons/apple-touch-icon-72x72.png" />
+<link rel="apple-touch-icon" sizes="114x114" href="icons/apple-touch-icon-114x114.png" />
+<link rel="icon" type="image/png" href="icons/favicon.png" />
+
+<style>
+
+body
+{
+  padding: 0;
+  margin: 0;
+  overflow: hidden;
+  background: -webkit-gradient(linear, left top, right bottom, from(#EBEDE9), to(#888A85));
+}
+
+#needleCanvas
+{
+  position: absolute;
+  -webkit-transition-property: -webkit-transform;
+  -webkit-transition-duration: .5s;
+  -webkit-transition-timing-function: ease-out;
+}
+
+.label
+{
+  font-family: sans-serif;
+  font-size: 18px;
+  text-align: center;
+  padding: 0;
+  margin: 0;
+}
+
+#degrees
+{
+  color: #fff;
+  position: absolute;
+}
+
+#direction
+{
+  color: #000;
+  position: absolute;
+}
+
+</style>
+
+<script type="text/javascript">
+
+var w, h, faceRadius, faceDiameter;
+var needleAngle, needleWidth, needleLength, crossLength, faceShapeLength, faceShapeLengthShort, faceShapeWidth, ringWidth;
+var renderingInterval;
+var currentHeading;
+var hasCompass;
+var faceFontSize, faceFontSizeSmall, dataFontSize;
+
+var NEEDLE_ANIMATION_UPDATE_INTERVAL = 100;
+
+var DATA_TEXT_MARGIN = 5;
+var FACE_TEXT_MARGIN = 15;
+
+var FACE_COLOR               = '#fff';
+var FACE_SHAPE_COLOR         = '#ddd';
+var FACE_TEXT_COLOR          = '#000';
+var NORTH_NEEDLE_COLOR_DARK  = '#990000';
+var NORTH_NEEDLE_COLOR_LIGHT = '#cc0000';
+var SOUTH_NEEDLE_COLOR_DARK  = '#3465a4';
+var SOUTH_NEEDLE_COLOR_LIGHT = '#193966';
+var CENTER_COLOR             = '#ddd';
+var CENTER_CROSS_COLOR       = '#333';
+function init()
+{
+  currentHeading = 0;
+  measure();
+  drawFace();
+  drawNeedle();
+  drawLabels();
+  testForCompass();
+}
+
+function onResize(event)
+{
+  stop();
+  if (!measure()) return;
+  drawFace();
+  drawNeedle();
+  drawLabels();
+  start();
+}
+
+function measure()
+{
+  w = window.innerWidth;
+  h = window.innerHeight;
+  
+  if (w <= 10 || h <= 10) return false;
+  
+  faceDiameter = Math.min(w, h) - 20;
+  faceRadius = faceDiameter / 2;
+  
+  needleLength = faceDiameter - 10;
+  needleWidth = needleLength / 10;
+  
+  ringWidth = faceDiameter / 75;
+  
+  faceShapeLength = (needleLength * .95) / 2;
+  faceShapeLengthShort = faceShapeLength / 2;
+  faceShapeWidth = needleWidth * .75;
+  
+  crossLength = needleWidth / 8;
+
+  faceFontSize = needleWidth * 1.5;
+  faceFontSizeSmall = faceFontSize * .75;
+  dataFontSize = needleWidth;
+
+  return true;
+}
+
+function drawFace()
+{
+  var canvas = document.getElementById('faceCanvas');
+  
+  canvas.width = w;
+  canvas.height = h;
+  
+  faceContext = canvas.getContext('2d');
+  
+  faceContext.clearRect(0, 0, w, h);
+
+  // Radial gradient
+  var faceGradient = faceContext.createRadialGradient(w/2, h/2, faceRadius, w/2, h/2, faceDiameter/3);
+  faceGradient.addColorStop(.3, '#ccc');
+  faceGradient.addColorStop(.7, '#fff');
+  faceGradient.addColorStop(0, '#fff');
+  
+  // Background
+  faceContext.fillStyle = FACE_COLOR;
+  faceContext.beginPath();
+  faceContext.arc(w / 2, h / 2, faceRadius, 0, degToRad(360), false);
+  faceContext.fillStyle = faceGradient;
+  faceContext.fill();
+  
+  // Outer border
+  faceContext.strokeStyle = '#000';
+  faceContext.beginPath();
+  faceContext.arc(w / 2, h / 2, faceRadius, 0, degToRad(360), false);
+  faceContext.stroke();
+  
+  // Ticks
+  var xOffset = w / 2;
+  var yOffset = h / 2;
+  for (var i = 0; i < 360; ++i)
+  {
+    var x = (faceRadius * Math.cos(degToRad(i))) + xOffset;
+    var y = (faceRadius * Math.sin(degToRad(i))) + yOffset;
+
+    var x2 = ((faceRadius - ringWidth) * Math.cos(degToRad(i))) + xOffset;
+    var y2 = ((faceRadius - ringWidth) * Math.sin(degToRad(i))) + yOffset;
+
+    faceContext.beginPath();
+    faceContext.moveTo(x, y);
+    
+    faceContext.lineTo(x2, y2);
+    faceContext.closePath();
+    faceContext.stroke();
+  }
+
+  // Inner border
+  faceContext.beginPath();
+  faceContext.arc(w / 2, h / 2, faceRadius - ringWidth, 0, degToRad(360), false);
+  faceContext.stroke();
+
+  // Shapes (N, S, W, E)
+
+  faceContext.beginPath();
+  faceContext.fillStyle = FACE_SHAPE_COLOR;
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), h / 2);
+  faceContext.lineTo((w / 2), (h / 2) - faceShapeLength);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), h / 2);
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), h / 2);
+  faceContext.lineTo((w / 2), (h / 2) + faceShapeLength);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), h / 2);
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) - faceShapeLength, (h / 2));
+  faceContext.lineTo((w / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) + faceShapeLength, (h / 2));
+  faceContext.lineTo((w / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.fill();
+
+  // Shapes (NW, SE, SW, NE)
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) - faceShapeLengthShort, (h / 2) - faceShapeLengthShort);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) + faceShapeLengthShort, (h / 2) + faceShapeLengthShort);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) + faceShapeLengthShort, (h / 2) - faceShapeLengthShort);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.fill();
+
+  faceContext.beginPath();
+  faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), (h / 2) - (faceShapeWidth / 2));
+  faceContext.lineTo((w / 2) - faceShapeLengthShort, (h / 2) + faceShapeLengthShort);
+  faceContext.lineTo((w / 2) + (faceShapeWidth / 2), (h / 2) + (faceShapeWidth / 2));
+  faceContext.fill();
+
+  // Text
+  faceContext.font = faceFontSize + 'px serif';
+  faceContext.fillStyle = FACE_TEXT_COLOR;
+  
+  // N
+  faceContext.textBaseline = 'alphabetic';
+  var metrics = faceContext.measureText('N');
+  faceContext.fillText('N', ((w / 2) - (metrics.width / 2)), ((h / 2) - (faceRadius) + needleWidth) + FACE_TEXT_MARGIN);
+  
+  // S
+  metrics = faceContext.measureText('S');
+  faceContext.fillText('S', ((w / 2) - (metrics.width / 2)), ((h / 2) + faceRadius) - FACE_TEXT_MARGIN);
+
+  // W
+  faceContext.fillText('W', ((w / 2) - faceRadius) + FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
+
+  // E
+  metrics = faceContext.measureText('E');
+  faceContext.fillText('E', ((w / 2) + (faceRadius - metrics.width)) - FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
+
+  faceContext.font = faceFontSizeSmall * .5 + 'px serif';
+  
+  // NW
+  var metrics = faceContext.measureText('NW');
+  faceContext.fillText('NW', ((w / 2) - faceShapeLengthShort - (metrics.width / 2)), (h / 2) - faceShapeLengthShort);
+
+  // NE
+  var metrics = faceContext.measureText('NE');
+  faceContext.fillText('NE', ((w / 2) + faceShapeLengthShort - (metrics.width / 2)), (h / 2) - faceShapeLengthShort);
+
+  // SE
+  var metrics = faceContext.measureText('SE');
+  faceContext.fillText('SE', ((w / 2) + faceShapeLengthShort - (metrics.width / 2)), ((h / 2) + faceShapeLengthShort + (faceFontSizeSmall / 3)));
+
+  // SW
+  var metrics = faceContext.measureText('SW');
+  faceContext.fillText('SW', ((w / 2) - faceShapeLengthShort - (metrics.width / 2)), ((h / 2) + faceShapeLengthShort + (faceFontSizeSmall / 3)));
+
+}
+
+function drawNeedle()
+{
+  needleAngle = 0;
+
+  var needleCanvas = document.getElementById('needleCanvas');
+  
+  needleCanvas.width = faceDiameter;
+  needleCanvas.height = faceDiameter;
+  
+  needleCanvas.style.left = (w / 2) - (faceDiameter / 2) + 'px';
+  needleCanvas.style.top = (h/2) - (faceDiameter / 2) + 'px';
+  
+  needleContext = needleCanvas.getContext('2d');
+  needleContext.translate(faceDiameter / 2, faceDiameter / 2);
+  
+  needleContext.clearRect((needleContext.canvas.width / 2) * -1, (needleContext.canvas.height / 2) * -1, needleContext.canvas.width, needleContext.canvas.height);
+
+  // Set up the drop shadow.
+  needleContext.shadowOffsetX = 5;
+  needleContext.shadowOffsetY = 5;
+  needleContext.shadowBlur = 10;
+  needleContext.shadowColor = '#000';
+
+  needleContext.beginPath();
+  needleContext.fillStyle = SOUTH_NEEDLE_COLOR_LIGHT;
+  needleContext.moveTo(0, 0);
+  needleContext.lineTo(0, needleLength / 2);
+  needleContext.lineTo((needleWidth / 2) * -1, 0);
+  needleContext.fill();
+    
+  needleContext.beginPath();
+  needleContext.fillStyle = SOUTH_NEEDLE_COLOR_DARK;
+  needleContext.moveTo(0, 0);
+  needleContext.lineTo(0, needleLength / 2);
+  needleContext.lineTo(needleWidth / 2, 0);
+  needleContext.fill();
+    
+  needleContext.beginPath();
+  needleContext.fillStyle = NORTH_NEEDLE_COLOR_LIGHT;
+  needleContext.moveTo(0, 0);
+  needleContext.lineTo(0, (needleLength / 2) * -1);
+  needleContext.lineTo((needleWidth / 2) * -1, 0);
+  needleContext.fill();
+  
+  needleContext.beginPath();
+  needleContext.fillStyle = NORTH_NEEDLE_COLOR_DARK;
+  needleContext.moveTo(0, 0);
+  needleContext.lineTo(0, (needleLength / 2) * -1);
+  needleContext.lineTo(needleWidth / 2, 0);
+  needleContext.fill();
+  
+  var pinGradient = needleContext.createRadialGradient(0, 0, needleWidth / 3, 0, 0, needleWidth / 6);
+  pinGradient.addColorStop(0, '#bbb');
+  pinGradient.addColorStop(1, '#fff');
+  
+  needleContext.beginPath();
+  needleContext.moveTo(0, 0);
+  needleContext.arc(0, 0, (needleWidth / 3), 0, degToRad(360), false);
+  needleContext.fillStyle = pinGradient;
+  needleContext.fill();
+
+  needleContext.beginPath();
+  needleContext.strokeStyle = CENTER_CROSS_COLOR;
+  needleContext.moveTo(crossLength * -1, crossLength * -1);
+  needleContext.lineTo(crossLength, crossLength);
+  needleContext.closePath();
+  needleContext.stroke();
+
+  needleContext.beginPath();
+  needleContext.strokeStyle = CENTER_CROSS_COLOR;
+  needleContext.moveTo(crossLength, crossLength * -1);
+  needleContext.lineTo(crossLength * -1, crossLength);
+  needleContext.closePath();
+  needleContext.stroke();
+}
+
+function drawLabels()
+{
+  var degrees = document.getElementById('degrees');
+  var direction = document.getElementById('direction');
+
+  degrees.style.fontSize = dataFontSize + 'px';
+  direction.style.fontSize = dataFontSize + 'px';
+
+  if (h > w) // Portrait
+  {
+    var gap = (h - faceDiameter) / 2;
+
+    degrees.style.width = (w - (DATA_TEXT_MARGIN * 2)) + 'px';
+    degrees.style.left = DATA_TEXT_MARGIN + 'px';
+    
+    if (gap > needleWidth)
+    {
+        degrees.style.textAlign = 'center';
+        degrees.style.top = (h - (needleWidth / 2) - (gap / 2) - DATA_TEXT_MARGIN) + 'px';
+        direction.style.textAlign = 'center';
+        direction.style.top = (gap / 2) - (needleWidth / 2) + 'px';
+    }
+    else
+    {
+        degrees.style.textAlign = 'right';
+        degrees.style.top = (h - needleWidth - (DATA_TEXT_MARGIN * 2)) + 'px';
+        direction.style.textAlign = 'left';
+        direction.style.top = DATA_TEXT_MARGIN + 'px';
+    }
+    
+    direction.style.width = (w - (DATA_TEXT_MARGIN * 2)) + 'px';
+    direction.style.left = DATA_TEXT_MARGIN + 'px';
+  }
+  else // Landscape
+  {
+    var gap = (w - faceDiameter) / 2;
+        
+    direction.style.width = ((w / 2) - DATA_TEXT_MARGIN) +'px';
+    direction.style.left = DATA_TEXT_MARGIN + 'px';
+    direction.style.top = DATA_TEXT_MARGIN + 'px';
+    direction.style.textAlign = 'left';
+
+    degrees.style.width = ((w / 2) - DATA_TEXT_MARGIN) + 'px';
+    degrees.style.right = DATA_TEXT_MARGIN + 'px';
+    degrees.style.left = null;
+    degrees.style.top = DATA_TEXT_MARGIN + 'px';
+    degrees.style.textAlign = 'right';
+  }
+}
+
+function start()
+{
+  if (hasCompass)
+  {
+    window.addEventListener('deviceorientation', onDeviceOrientationChange);
+    if (navigator.userAgent.toLowerCase().indexOf('android') != -1)
+    {
+      // On Android, we have to listen for resize events. That's how you get
+      // the dorrect innerWidth and innerWidth.
+      window.addEventListener('resize', onResize);
+    }
+    else
+    {
+      // On iOS, we can't use resize events because they fire everytime innerHTML
+      // is set. Instead, we'll use 'orientationchange' events.
+      window.addEventListener('orientationchange', function(event){onResize()});
+    }
+    renderingInterval = setInterval(animateNeedle, NEEDLE_ANIMATION_UPDATE_INTERVAL);  
+  }
+  else
+  {
+    setupDesktop();
+  }
+}
+
+function testForCompass()
+{
+  if (window.DeviceOrientationEvent)
+  {
+    window.addEventListener('deviceorientation', compassTest);
+  }
+  else
+  {
+    hasCompass = false;
+    start();
+  }
+}
+
+function compassTest(event)
+{
+  window.removeEventListener('deviceorientation', compassTest);
+  if (event.webkitCompassHeading != undefined || event.alpha != null) // Device does have a compass
+  {
+    hasCompass = true;
+  }
+  else
+  {
+    hasCompass = false;
+  }
+  start();
+}
+
+function setupDesktop()
+{
+  window.orientation = 0;
+  window.addEventListener('resize', onResize);
+  document.getElementById('needleCanvas').onclick = onCompassClick;
+}
+
+function stop()
+{
+  if (renderingInterval) clearInterval(renderingInterval);
+  window.removeEventListener('deviceorientation', onDeviceOrientationChange);
+  window.removeEventListener('resize', onResize);
+  document.getElementById('needleCanvas').onclick = null;
+}
+
+function animateNeedle()
+{
+  var multiplier = Math.floor(needleAngle / 360);
+  var adjustedCurrentHeading = (multiplier * 360) + currentHeading;
+  var delta = adjustedCurrentHeading - needleAngle;
+  if (Math.abs(delta) > 180)
+  {
+    if (delta < 0)
+    {
+      delta += 360;
+    }
+    else
+    {
+      delta -= 360;  
+    }
+  }
+  needleAngle = needleAngle + delta;
+  var needleCanvas = document.getElementById('needleCanvas');
+  needleCanvas.style.webkitTransform = 'rotate('+ (needleAngle - window.orientation) +'deg)'; // Rotate _to_ the number indicated, not _by_ the number indicated
+  updateLabels();
+}
+
+function updateLabels()
+{
+  var degrees = document.getElementById('degrees');
+  var direction = document.getElementById('direction');
+  
+  var degreeValue = Math.round(currentHeading - window.orientation);
+  
+  if (degreeValue < 0)
+  {
+    degreeValue += (Math.ceil(Math.abs(degreeValue) / 360) * 360);
+  }
+  else if (degreeValue > 360)
+  {
+    degreeValue -= 360;
+  }
+  
+  degrees.innerHTML = degreeValue + '&deg;';
+  
+  if (degreeValue >= 337.5 || (degreeValue >= 0 && degreeValue < 22.5))
+  {
+  	direction.innerHTML = "N";
+  }
+  else if (degreeValue >= 22.5 && degreeValue < 67.5)
+  {
+  	direction.innerHTML = "NE";
+  }
+  else if (degreeValue >= 67.5 && degreeValue < 112.5)
+  {
+  	direction.innerHTML = "E";
+  }
+  else if (degreeValue >= 112.5 && degreeValue < 157.5)
+  {
+  	direction.innerHTML = "SE";
+  }
+  else if (degreeValue >= 157.5 && degreeValue < 202.5)
+  {
+  	direction.innerHTML = "S";
+  }
+  else if (degreeValue >= 202.5 && degreeValue < 247.5)
+  {
+  	direction.innerHTML = "SW";
+  }
+  else if (degreeValue >= 247.5 && degreeValue < 292.5)
+  {
+  	direction.innerHTML = "W";
+  }
+  else if (degreeValue >= 292.5 && degreeValue < 337.5)
+  {
+  	direction.innerHTML = "NW";
+  }
+
+}
+
+// For desktop/testing/simulation.
+function onCompassClick(event)
+{
+  var A = [faceRadius, faceRadius];
+  var B = [event.x - ((w /2) - faceRadius), event.y - ((h/2) - faceRadius)];
+  var C = [faceRadius, 0];
+  
+  var a = Math.sqrt( Math.pow((B[0] - C[0]), 2) + Math.pow((B[1] - C[1]), 2) );
+  var b = Math.sqrt( Math.pow((A[0] - C[0]), 2) + Math.pow((A[1] - C[1]), 2) );
+  var c = Math.sqrt( Math.pow((B[0] - A[0]), 2) + Math.pow((B[1] - A[1]), 2) );
+
+  var cosA = (Math.pow(b, 2) + Math.pow(c, 2) - Math.pow(a, 2)) / (2*b*c);
+  var angle = radToDeg(Math.acos(cosA));
+
+  if (B[0] < A[0])
+  {
+    angle = 180 + (180 - angle);
+  }
+
+  currentHeading = angle;
+  animateNeedle();
+}
+
+function onDeviceOrientationChange(event)
+{  
+  if (event.webkitCompassHeading != undefined)
+  {
+    this.currentHeading = (360 - event.webkitCompassHeading);
+  }
+  else
+  {
+    currentHeading = (270 - event.alpha) * -1;
+  }
+}
+
+// Utility functions
+
+function degToRad(deg)
+{
+  return (deg * Math.PI) / 180;
+}
+
+function radToDeg(rad)
+{
+  return (rad * 180) / Math.PI;
+}
+
+function dump(obj, filter)
+{
+  for (key in obj)
+  {
+    if (filter && key.indexOf(filter) != 0) continue;
+    console.log(key + ': ' + obj[key]);
+  }
+}
+
+window.onload = init;
+
+</script>
+
+</head>
+
+<body>
+  <canvas id="faceCanvas"></canvas>
+  <canvas id="needleCanvas"></canvas>
+  <div id="degrees" class="label">---</div>
+  <div id="direction" class="label">--</div>
+</body>
+
+</html>
