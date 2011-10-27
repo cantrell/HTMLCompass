@@ -1,17 +1,38 @@
 <!DOCTYPE html>
-<html>
+
+<html manifest="compass.manifest">
+
+<!--
+Written by Christian Cantrell
+http://www.livingdigitally.net
+christian.cantrell@gmail.com
+
+Copyright (c) 2011 Christian Cantrell
+Released under The MIT License (MIT):
+http://www.opensource.org/licenses/mit-license.php
+-->
 
 <head>
 
 <title>Compass</title>
 
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<meta name="apple-mobile-web-app-status-bar-style" content="black"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 
+<!-- Home screen icons -->
 <link rel="apple-touch-icon" sizes="57x57" href="icons/apple-touch-icon-57x57.png" />
 <link rel="apple-touch-icon" sizes="72x72" href="icons/apple-touch-icon-72x72.png" />
 <link rel="apple-touch-icon" sizes="114x114" href="icons/apple-touch-icon-114x114.png" />
+
+<!-- Start-up images -->
+
+<!-- iPad -->
+<link rel="apple-touch-startup-image" href="starts/ipad-landscape.jpg" media="screen and (min-device-width: 481px) and (max-device-width: 1024px) and (orientation:landscape)" />
+<link rel="apple-touch-startup-image" href="starts/ipad-portrait.jpg" media="screen and (min-device-width: 481px) and (max-device-width: 1024px) and (orientation:portrait)" />
+<!-- iPhone (retina) -->
+<link rel="apple-touch-startup-image" href="starts/iphone-retina.jpg" media="screen and (max-device-width: 640px)" />
+
 <link rel="icon" type="image/png" href="icons/favicon.png" />
 
 <style>
@@ -35,21 +56,11 @@ body
 .label
 {
   font-family: sans-serif;
-  font-size: 18px;
+  color: #ccc;
+  text-shadow: 2px 2px 5px #000;
   text-align: center;
   padding: 0;
   margin: 0;
-}
-
-#degrees
-{
-  color: #fff;
-  position: absolute;
-}
-
-#direction
-{
-  color: #000;
   position: absolute;
 }
 
@@ -66,26 +77,40 @@ var faceFontSize, faceFontSizeSmall, dataFontSize;
 
 var NEEDLE_ANIMATION_UPDATE_INTERVAL = 100;
 
-var DATA_TEXT_MARGIN = 5;
-var FACE_TEXT_MARGIN = 15;
+var MARGINS = {
+  DATA_TEXT_MARGIN: 5,
+  FACE_TEXT_MARGIN: 20
+}
 
-var FACE_COLOR               = '#fff';
-var FACE_SHAPE_COLOR         = '#ddd';
-var FACE_TEXT_COLOR          = '#000';
-var NORTH_NEEDLE_COLOR_DARK  = '#990000';
-var NORTH_NEEDLE_COLOR_LIGHT = '#cc0000';
-var SOUTH_NEEDLE_COLOR_DARK  = '#3465a4';
-var SOUTH_NEEDLE_COLOR_LIGHT = '#193966';
-var CENTER_COLOR             = '#ddd';
-var CENTER_CROSS_COLOR       = '#333';
+var COLORS = {
+  FACE_COLOR               : '#fff',
+  FACE_SHAPE_COLOR         : '#ddd',
+  FACE_TEXT_COLOR          : '#000',
+  NORTH_NEEDLE_COLOR_DARK  : '#990000',
+  NORTH_NEEDLE_COLOR_LIGHT : '#cc0000',
+  SOUTH_NEEDLE_COLOR_DARK  : '#3465a4',
+  SOUTH_NEEDLE_COLOR_LIGHT : '#193966',
+  PIN_COLOR                : '#ddd',
+  CENTER_CROSS_COLOR       : '#333'
+}
+
 function init()
 {
+  checkForUpdate();
   currentHeading = 0;
   measure();
   drawFace();
   drawNeedle();
   drawLabels();
   testForCompass();
+}
+
+function checkForUpdate()
+{
+  if (window.applicationCache != undefined && window.applicationCache != null)
+  {
+    window.applicationCache.addEventListener('updateready', function(event) { window.applicationCache.swapCache(); window.location.reload(); } );
+  }
 }
 
 function onResize(event)
@@ -144,7 +169,7 @@ function drawFace()
   faceGradient.addColorStop(0, '#fff');
   
   // Background
-  faceContext.fillStyle = FACE_COLOR;
+  faceContext.fillStyle = COLORS.FACE_COLOR;
   faceContext.beginPath();
   faceContext.arc(w / 2, h / 2, faceRadius, 0, degToRad(360), false);
   faceContext.fillStyle = faceGradient;
@@ -181,9 +206,8 @@ function drawFace()
   faceContext.stroke();
 
   // Shapes (N, S, W, E)
-
   faceContext.beginPath();
-  faceContext.fillStyle = FACE_SHAPE_COLOR;
+  faceContext.fillStyle = COLORS.FACE_SHAPE_COLOR;
   faceContext.moveTo((w / 2)  - (faceShapeWidth / 2), h / 2);
   faceContext.lineTo((w / 2), (h / 2) - faceShapeLength);
   faceContext.lineTo((w / 2) + (faceShapeWidth / 2), h / 2);
@@ -234,23 +258,23 @@ function drawFace()
 
   // Text
   faceContext.font = faceFontSize + 'px serif';
-  faceContext.fillStyle = FACE_TEXT_COLOR;
+  faceContext.fillStyle = COLORS.FACE_TEXT_COLOR;
   
   // N
   faceContext.textBaseline = 'alphabetic';
   var metrics = faceContext.measureText('N');
-  faceContext.fillText('N', ((w / 2) - (metrics.width / 2)), ((h / 2) - (faceRadius) + needleWidth) + FACE_TEXT_MARGIN);
+  faceContext.fillText('N', ((w / 2) - (metrics.width / 2)), ((h / 2) - (faceRadius) + needleWidth) + MARGINS.FACE_TEXT_MARGIN);
   
   // S
   metrics = faceContext.measureText('S');
-  faceContext.fillText('S', ((w / 2) - (metrics.width / 2)), ((h / 2) + faceRadius) - FACE_TEXT_MARGIN);
+  faceContext.fillText('S', ((w / 2) - (metrics.width / 2)), ((h / 2) + faceRadius) - MARGINS.FACE_TEXT_MARGIN);
 
   // W
-  faceContext.fillText('W', ((w / 2) - faceRadius) + FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
+  faceContext.fillText('W', ((w / 2) - faceRadius) + MARGINS.FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
 
   // E
   metrics = faceContext.measureText('E');
-  faceContext.fillText('E', ((w / 2) + (faceRadius - metrics.width)) - FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
+  faceContext.fillText('E', ((w / 2) + (faceRadius - metrics.width)) - MARGINS.FACE_TEXT_MARGIN, ((h / 2) + (needleWidth / 2)));
 
   faceContext.font = faceFontSizeSmall * .5 + 'px serif';
   
@@ -296,52 +320,48 @@ function drawNeedle()
   needleContext.shadowColor = '#000';
 
   needleContext.beginPath();
-  needleContext.fillStyle = SOUTH_NEEDLE_COLOR_LIGHT;
+  needleContext.fillStyle = COLORS.SOUTH_NEEDLE_COLOR_LIGHT;
   needleContext.moveTo(0, 0);
   needleContext.lineTo(0, needleLength / 2);
   needleContext.lineTo((needleWidth / 2) * -1, 0);
   needleContext.fill();
     
   needleContext.beginPath();
-  needleContext.fillStyle = SOUTH_NEEDLE_COLOR_DARK;
+  needleContext.fillStyle = COLORS.SOUTH_NEEDLE_COLOR_DARK;
   needleContext.moveTo(0, 0);
   needleContext.lineTo(0, needleLength / 2);
   needleContext.lineTo(needleWidth / 2, 0);
   needleContext.fill();
     
   needleContext.beginPath();
-  needleContext.fillStyle = NORTH_NEEDLE_COLOR_LIGHT;
+  needleContext.fillStyle = COLORS.NORTH_NEEDLE_COLOR_LIGHT;
   needleContext.moveTo(0, 0);
   needleContext.lineTo(0, (needleLength / 2) * -1);
   needleContext.lineTo((needleWidth / 2) * -1, 0);
   needleContext.fill();
   
   needleContext.beginPath();
-  needleContext.fillStyle = NORTH_NEEDLE_COLOR_DARK;
+  needleContext.fillStyle = COLORS.NORTH_NEEDLE_COLOR_DARK;
   needleContext.moveTo(0, 0);
   needleContext.lineTo(0, (needleLength / 2) * -1);
   needleContext.lineTo(needleWidth / 2, 0);
   needleContext.fill();
-  
-  var pinGradient = needleContext.createRadialGradient(0, 0, needleWidth / 3, 0, 0, needleWidth / 6);
-  pinGradient.addColorStop(0, '#bbb');
-  pinGradient.addColorStop(1, '#fff');
   
   needleContext.beginPath();
   needleContext.moveTo(0, 0);
   needleContext.arc(0, 0, (needleWidth / 3), 0, degToRad(360), false);
-  needleContext.fillStyle = pinGradient;
+  needleContext.fillStyle = COLORS.PIN_COLOR;
   needleContext.fill();
 
   needleContext.beginPath();
-  needleContext.strokeStyle = CENTER_CROSS_COLOR;
+  needleContext.strokeStyle = COLORS.CENTER_CROSS_COLOR;
   needleContext.moveTo(crossLength * -1, crossLength * -1);
   needleContext.lineTo(crossLength, crossLength);
   needleContext.closePath();
   needleContext.stroke();
 
   needleContext.beginPath();
-  needleContext.strokeStyle = CENTER_CROSS_COLOR;
+  needleContext.strokeStyle = COLORS.CENTER_CROSS_COLOR;
   needleContext.moveTo(crossLength, crossLength * -1);
   needleContext.lineTo(crossLength * -1, crossLength);
   needleContext.closePath();
@@ -360,40 +380,40 @@ function drawLabels()
   {
     var gap = (h - faceDiameter) / 2;
 
-    degrees.style.width = (w - (DATA_TEXT_MARGIN * 2)) + 'px';
-    degrees.style.left = DATA_TEXT_MARGIN + 'px';
+    degrees.style.width = (w - (MARGINS.DATA_TEXT_MARGIN * 2)) + 'px';
+    degrees.style.left = MARGINS.DATA_TEXT_MARGIN + 'px';
     
     if (gap > needleWidth)
     {
         degrees.style.textAlign = 'center';
-        degrees.style.top = (h - (needleWidth / 2) - (gap / 2) - DATA_TEXT_MARGIN) + 'px';
+        degrees.style.top = (h - (needleWidth / 2) - (gap / 2) - MARGINS.DATA_TEXT_MARGIN) + 'px';
         direction.style.textAlign = 'center';
         direction.style.top = (gap / 2) - (needleWidth / 2) + 'px';
     }
     else
     {
         degrees.style.textAlign = 'right';
-        degrees.style.top = (h - needleWidth - (DATA_TEXT_MARGIN * 2)) + 'px';
+        degrees.style.top = (h - needleWidth - (MARGINS.DATA_TEXT_MARGIN * 2)) + 'px';
         direction.style.textAlign = 'left';
-        direction.style.top = DATA_TEXT_MARGIN + 'px';
+        direction.style.top = MARGINS.DATA_TEXT_MARGIN + 'px';
     }
     
-    direction.style.width = (w - (DATA_TEXT_MARGIN * 2)) + 'px';
-    direction.style.left = DATA_TEXT_MARGIN + 'px';
+    direction.style.width = (w - (MARGINS.DATA_TEXT_MARGIN * 2)) + 'px';
+    direction.style.left = MARGINS.DATA_TEXT_MARGIN + 'px';
   }
   else // Landscape
   {
     var gap = (w - faceDiameter) / 2;
         
-    direction.style.width = ((w / 2) - DATA_TEXT_MARGIN) +'px';
-    direction.style.left = DATA_TEXT_MARGIN + 'px';
-    direction.style.top = DATA_TEXT_MARGIN + 'px';
+    direction.style.width = ((w / 2) - MARGINS.DATA_TEXT_MARGIN) +'px';
+    direction.style.left = MARGINS.DATA_TEXT_MARGIN + 'px';
+    direction.style.top = MARGINS.DATA_TEXT_MARGIN + 'px';
     direction.style.textAlign = 'left';
 
-    degrees.style.width = ((w / 2) - DATA_TEXT_MARGIN) + 'px';
-    degrees.style.right = DATA_TEXT_MARGIN + 'px';
+    degrees.style.width = ((w / 2) - MARGINS.DATA_TEXT_MARGIN) + 'px';
+    degrees.style.right = MARGINS.DATA_TEXT_MARGIN + 'px';
     degrees.style.left = null;
-    degrees.style.top = DATA_TEXT_MARGIN + 'px';
+    degrees.style.top = MARGINS.DATA_TEXT_MARGIN + 'px';
     degrees.style.textAlign = 'right';
   }
 }
@@ -406,12 +426,12 @@ function start()
     if (navigator.userAgent.toLowerCase().indexOf('android') != -1)
     {
       // On Android, we have to listen for resize events. That's how you get
-      // the dorrect innerWidth and innerWidth.
+      // the correct innerWidth and innerHeight.
       window.addEventListener('resize', onResize);
     }
     else
     {
-      // On iOS, we can't use resize events because they fire everytime innerHTML
+      // On iOS, we can't use resize events because they fire every time innerHTML
       // is set. Instead, we'll use 'orientationchange' events.
       window.addEventListener('orientationchange', function(event){onResize()});
     }
@@ -425,7 +445,15 @@ function start()
 
 function testForCompass()
 {
-  if (window.DeviceOrientationEvent)
+  var ua = navigator.userAgent.toLowerCase();
+  // Let's do _something_ for unsupported browsers.
+  if (ua.indexOf('firefox') != -1 || ua.indexOf('opera') != -1 || ua.indexOf('msie') != -1)
+  {
+    hasCompass = false;
+    start();
+    alert('Only WebKit-based browsers are supported at this time.');
+  }
+  else if (window.DeviceOrientationEvent)
   {
     window.addEventListener('deviceorientation', compassTest);
   }
@@ -433,6 +461,7 @@ function testForCompass()
   {
     hasCompass = false;
     start();
+    desktopAlert();
   }
 }
 
@@ -446,6 +475,7 @@ function compassTest(event)
   else
   {
     hasCompass = false;
+    desktopAlert();
   }
   start();
 }
@@ -455,6 +485,11 @@ function setupDesktop()
   window.orientation = 0;
   window.addEventListener('resize', onResize);
   document.getElementById('needleCanvas').onclick = onCompassClick;
+}
+
+function desktopAlert()
+{
+  alert('No compass was detected.\nClick on the compass dial to select north.');
 }
 
 function stop()
@@ -575,7 +610,7 @@ function onDeviceOrientationChange(event)
   }
 }
 
-// Utility functions
+// Utility functions -- not app specific.
 
 function degToRad(deg)
 {
