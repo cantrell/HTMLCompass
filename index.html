@@ -453,6 +453,12 @@ function testForCompass()
     start();
     alert('Only WebKit-based browsers are supported at this time.');
   }
+  else if (ua.indexOf('iphone os 4') != -1)
+  {
+    hasCompass = false;
+    start();
+    alert('This application requires iOS 5 or higher.');  
+  }
   else if (window.DeviceOrientationEvent)
   {
     window.addEventListener('deviceorientation', compassTest);
@@ -467,6 +473,7 @@ function testForCompass()
 
 function compassTest(event)
 {
+  console.log(navigator.userAgent);
   window.removeEventListener('deviceorientation', compassTest);
   if (event.webkitCompassHeading != undefined || event.alpha != null) // Device does have a compass
   {
