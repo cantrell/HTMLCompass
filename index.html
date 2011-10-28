@@ -75,7 +75,7 @@ var currentHeading;
 var hasCompass;
 var faceFontSize, faceFontSizeSmall, dataFontSize;
 
-var NEEDLE_ANIMATION_UPDATE_INTERVAL = 100;
+var NEEDLE_ANIMATION_UPDATE_INTERVAL = 50;
 
 var MARGINS = {
   DATA_TEXT_MARGIN: 5,
@@ -473,7 +473,6 @@ function testForCompass()
 
 function compassTest(event)
 {
-  console.log(navigator.userAgent);
   window.removeEventListener('deviceorientation', compassTest);
   if (event.webkitCompassHeading != undefined || event.alpha != null) // Device does have a compass
   {
@@ -523,6 +522,7 @@ function animateNeedle()
       delta -= 360;  
     }
   }
+  if (hasCompass) delta = delta / 10; // Add a little additional easing (for devices only).
   needleAngle = needleAngle + delta;
   var needleCanvas = document.getElementById('needleCanvas');
   needleCanvas.style.webkitTransform = 'rotate('+ (needleAngle - window.orientation) +'deg)'; // Rotate _to_ the number indicated, not _by_ the number indicated
