@@ -71,11 +71,14 @@ body
 var w, h, faceRadius, faceDiameter;
 var needleAngle, needleWidth, needleLength, crossLength, faceShapeLength, faceShapeLengthShort, faceShapeWidth, ringWidth;
 var renderingInterval = -1;
+var simulationInterval = -1;
 var currentHeading;
 var hasCompass;
 var faceFontSize, faceFontSizeSmall, dataFontSize;
+var mouseX, mouseY;
 
 var NEEDLE_ANIMATION_UPDATE_INTERVAL = 100;
+var SIMULATION_INTERVAL = 50;
 
 var MARGINS = {
     DATA_TEXT_MARGIN: 5,
@@ -103,6 +106,8 @@ function init()
     drawFace();
     drawNeedle();
     drawLabels();
+    mouseX = w / 2;
+    mouseY = 0;
     testForCompass();
 }
 
@@ -418,9 +423,10 @@ function drawLabels()
 
 function start()
 {
+    window.addEventListener('deviceorientation', onDeviceOrientationChange);
+
     if (hasCompass)
     {
-        window.addEventListener('deviceorientation', onDeviceOrientationChange);
         if (navigator.userAgent.toLowerCase().indexOf('android') != -1) // Android
         {
             // On Android, we have to listen for resize events. That's how you get
@@ -467,7 +473,6 @@ function testForCompass()
     {
         hasCompass = false;
         start();
-        desktopAlert();
     }
 }
 
@@ -481,7 +486,6 @@ function compassTest(event)
     else
     {
         hasCompass = false;
-        desktopAlert();
     }
     start();
 }
@@ -490,21 +494,27 @@ function setupDesktop()
 {
     window.orientation = 0;
     window.addEventListener('resize', onResize);
-    document.getElementById('needleCanvas').onclick = onCompassClick;
+    document.onmousemove = function(e) {mouseX = e.clientX; mouseY = e.clientY};
+    simulationInterval = setInterval(simulateGyroscope, SIMULATION_INTERVAL);
 }
 
-function desktopAlert()
+function simulateGyroscope()
 {
-    alert('No compass was detected.\nClick on the compass dial to select north.');
+    var event = document.createEvent('Event');
+    event.initEvent('deviceorientation', true, true);
+    var mouseAngle = getMouseAngle(mouseX, mouseY);
+    event.webkitCompassHeading = (360 - mouseAngle);
+    window.dispatchEvent(event);
 }
 
 function stop()
 {
     if (renderingInterval) clearInterval(renderingInterval);
+    if (simulationInterval) clearInterval(simulationInterval);
     window.removeEventListener('deviceorientation', onDeviceOrientationChange);
     window.removeEventListener('resize', onResize);
     window.removeEventListener('orientationchange', onResize);
-    document.getElementById('needleCanvas').onclick = null;
+    document.onmousemove = null;
 }
 
 function animateNeedle()
@@ -524,9 +534,8 @@ function animateNeedle()
         }
     }
 
-    if (hasCompass) delta = delta / 5; // Add a little additional easing (for devices only).
+    delta /= 5; // Add a little additional easing (for devices only).
     needleAngle = needleAngle + delta;
-
     // Rotate _to_ the number indicated, not _by_ the number indicated
     var finalNeedleAngle = needleAngle - window.orientation;
     document.getElementById('needleCanvas').style.webkitTransform = 'rotate('+ (finalNeedleAngle) +'deg)';
@@ -585,11 +594,10 @@ function updateLabels()
     }
 }
 
-// For desktop/testing/simulation.
-function onCompassClick(event)
+function getMouseAngle(x, y)
 {
     var A = [faceRadius, faceRadius];
-    var B = [event.x - ((w /2) - faceRadius), event.y - ((h/2) - faceRadius)];
+    var B = [x - ((w /2) - faceRadius), y - ((h/2) - faceRadius)];
     var C = [faceRadius, 0];
 
     var a = Math.sqrt( Math.pow((B[0] - C[0]), 2) + Math.pow((B[1] - C[1]), 2) );
@@ -603,18 +611,16 @@ function onCompassClick(event)
     {
         angle = 180 + (180 - angle);
     }
-
-    currentHeading = angle;
-    animateNeedle();
+    return angle;
 }
 
 function onDeviceOrientationChange(event)
 {
     if (event.webkitCompassHeading != undefined)
     {
-        this.currentHeading = (360 - event.webkitCompassHeading);
+        currentHeading = (360 - event.webkitCompassHeading);
     }
-    else
+    else if (event.alpha != null)
     {
         currentHeading = (270 - event.alpha) * -1;
     }
