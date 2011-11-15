@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+
+<html>
+
+<head>
+
+<script type="text/javascript">
+
+function simulateGyroscope()
+{
+    var event = document.createEvent('Event');
+    event.initEvent('deviceorientation', true, true);
+    var mouseAngle = getMouseAngle(mouseX, mouseY);
+    event.webkitCompassHeading = (360 - mouseAngle);
+    window.dispatchEvent(event);
+}
+
+function getMouseAngle(x, y)
+{
+    var A = [faceRadius, faceRadius];
+    var B = [x - ((w /2) - faceRadius), y - ((h/2) - faceRadius)];
+    var C = [faceRadius, 0];
+
+    var a = Math.sqrt( Math.pow((B[0] - C[0]), 2) + Math.pow((B[1] - C[1]), 2) );
+    var b = Math.sqrt( Math.pow((A[0] - C[0]), 2) + Math.pow((A[1] - C[1]), 2) );
+    var c = Math.sqrt( Math.pow((B[0] - A[0]), 2) + Math.pow((B[1] - A[1]), 2) );
+
+    var cosA = (Math.pow(b, 2) + Math.pow(c, 2) - Math.pow(a, 2)) / (2*b*c);
+    var angle = radToDeg(Math.acos(cosA));
+
+    if (B[0] < A[0])
+    {
+        angle = 180 + (180 - angle);
+    }
+    return angle;
+}
+
+function setupDesktop()
+{
+    window.orientation = 0;
+    window.addEventListener('resize', onResize);
+    document.onmousemove = function(e) {mouseX = e.clientX; mouseY = e.clientY};
+    simulationInterval = setInterval(simulateGyroscope, SIMULATION_INTERVAL);
+}
+
+function stop()
+{
+    if (renderingInterval) clearInterval(renderingInterval);
+    window.removeEventListener('deviceorientation', onDeviceOrientationChange);
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('orientationchange', onResize);
+    document.onmousemove = null;
+}
+</script>
+
+</head>
+
+<body>
+
+</body>
+
+</html>
