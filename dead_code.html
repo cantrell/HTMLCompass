@@ -51,6 +51,41 @@ function stop()
     window.removeEventListener('orientationchange', onResize);
     document.onmousemove = null;
 }
+
+function start()
+{
+    window.addEventListener('deviceorientation', onDeviceOrientationChange);
+
+    if (hasCompass)
+    {
+        if (navigator.userAgent.toLowerCase().indexOf('android') != -1) // Android
+        {
+            // On Android, we have to listen for resize events. That's how you get
+            // the correct innerWidth and innerHeight.
+            window.addEventListener('resize', onResize);
+
+            // Use a rendering loop to smooth out the erratic gyroscope values.
+            renderingInterval = setInterval(animateNeedle, NEEDLE_ANIMATION_UPDATE_INTERVAL);
+        }
+        else // iOS
+        {
+            // On iOS, we can't use resize events because they fire every time innerHTML
+            // is set. Instead, we'll use 'orientationchange' events.
+            window.addEventListener('orientationchange', onResize);
+        }
+    }
+    else
+    {
+        setupDesktop();
+    }
+}
+
+function setupDesktop()
+{
+    window.orientation = 0;
+    window.addEventListener('resize', onResize);
+}
+
 </script>
 
 </head>
