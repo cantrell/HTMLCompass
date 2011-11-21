@@ -45,6 +45,11 @@ body
     background: -webkit-gradient(linear, left top, right bottom, from(#EBEDE9), to(#888A85));
 }
 
+#faceCanvas
+{
+    z-index: -1;
+}
+
 #needleCanvas
 {
     position: absolute;
@@ -64,6 +69,12 @@ body
     position: absolute;
 }
 
+button
+{
+    position: absolute;
+    z-index: 2;
+}
+
 </style>
 
 </head>
@@ -73,7 +84,11 @@ body
     <canvas id="needleCanvas"></canvas>
     <div id="degrees" class="label">---</div>
     <div id="direction" class="label">--</div>
+    <button id="mdButton" onclick="toggleMagneticDeclination();">True North</button>
+    <button id="mapButton" onclick="openMap();">Open Map</button>
 </body>
+
+<script src="WorldMagneticModel.js" type="text/javascript"></script>
 
 <script type="text/javascript">
 
@@ -83,6 +98,7 @@ var renderingInterval = -1;
 var currentHeading;
 var hasCompass;
 var faceFontSize, faceFontSizeSmall, dataFontSize;
+var magneticDeclination;
 
 var NEEDLE_ANIMATION_UPDATE_INTERVAL = 100;
 var SIMULATION_INTERVAL = 50;
@@ -104,11 +120,19 @@ var COLORS = {
     CENTER_CROSS_COLOR       : '#333'
 }
 
+var north = {
+    type           : null,
+    TRUE_NORTH     : 'tn',
+    MAGNETIC_NORTH : 'mn'
+}
+
 function init()
 {
     checkForUpdate();
     currentHeading = 0;
     needleAngle = 0;
+    north.type = north.MAGNETIC_NORTH;
+    magneticDeclination = 0;
     if (!measure()) return;
     drawFace();
     drawNeedle();
@@ -388,6 +412,12 @@ function drawLabels()
 {
     var degrees = document.getElementById('degrees');
     var direction = document.getElementById('direction');
+    var mdButton = document.getElementById('mdButton');
+    var mapButton = document.getElementById('mapButton');
+
+    mdButton.style.left = '2px';
+    mdButton.style.bottom = '2px';
+    mapButton.style.right = '2px';
 
     degrees.style.fontSize = dataFontSize + 'px';
     direction.style.fontSize = dataFontSize + 'px';
@@ -401,6 +431,7 @@ function drawLabels()
 
         if (gap > needleWidth)
         {
+            mapButton.style.bottom = '2px';
             degrees.style.textAlign = 'center';
             degrees.style.top = (h - (needleWidth / 2) - (gap / 2) - MARGINS.DATA_TEXT_MARGIN) + 'px';
             direction.style.textAlign = 'center';
@@ -408,6 +439,7 @@ function drawLabels()
         }
         else
         {
+            mapButton.style.top = '2px';
             degrees.style.textAlign = 'right';
             degrees.style.top = (h - needleWidth - (MARGINS.DATA_TEXT_MARGIN * 2)) + 'px';
             direction.style.textAlign = 'left';
@@ -419,6 +451,9 @@ function drawLabels()
     }
     else // Landscape
     {
+        mapButton.style.removeProperty('top');
+        mapButton.style.bottom = '2px';
+
         var gap = (w - faceDiameter) / 2;
 
         direction.style.width = ((w / 2) - MARGINS.DATA_TEXT_MARGIN) +'px';
@@ -581,7 +616,54 @@ function onDeviceOrientationChange(event)
     {
         currentHeading = (270 - event.alpha) * -1;
     }
+    currentHeading += magneticDeclination;
     if (renderingInterval == -1) animateNeedle();
+}
+
+function toggleMagneticDeclination()
+{
+    var mdButton = document.getElementById('mdButton');
+    if (north.type == north.MAGNETIC_NORTH) // Toggling to true north
+    {
+        var geo = navigator.geolocation;
+        if (!geo)
+        {
+            alert('Cannot determine location.');
+            return;
+        }
+        geo.getCurrentPosition(function(position) {
+            var lat = position.coords.latitude;
+            var long = position.coords.longitude;
+            var alt = (position.coords.altitude != null) ? position.coords.altitude : 0 ;
+            var magneticModel = new WorldMagneticModel();
+            var date = new Date();
+            var year = date.getFullYear();
+            var month = Math.round(((date.getMonth() / 11) * 10));
+            year += month / 10;
+            magneticDeclination = magneticModel.declination(alt, lat, long, year);
+            mdButton.innerHTML = 'Magnetic North';
+            north.type = north.TRUE_NORTH;
+        });
+    }
+    else // Toggling to magnetic north
+    {
+        magneticDeclination = 0;
+        mdButton.innerHTML = 'True North';
+        north.type = north.MAGNETIC_NORTH;
+    }
+}
+
+function openMap()
+{
+    var geo = navigator.geolocation;
+    if (!geo)
+    {
+        window.location.assign('http://maps.google.com');
+        return;
+    }
+    geo.getCurrentPosition(function(position) {
+        window.location.assign('http://maps.google.com?ll=' + position.coords.latitude + ',' + position.coords.longitude);
+    });
 }
 
 // Utility functions -- not app specific.
